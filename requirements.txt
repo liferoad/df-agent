@@ -1,0 +1,32 @@
+# Google Agent Development Kit (ADK)
+google-adk>=0.1.0
+
+# Model Context Protocol (MCP) dependencies
+mcp>=1.0.0
+
+# Google Cloud SDK Python client libraries
+google-cloud-dataflow-client>=0.8.0
+google-cloud-logging>=3.8.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
+
+# Additional dependencies for JSON handling and async operations
+aiofiles>=23.2.0
+pydantic>=2.5.0
+typing-extensions>=4.8.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# For CLI subprocess operations
+psutil>=5.9.0
+
+# Development and testing dependencies (optional)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.9.0
+flake8>=6.1.0
+mypy>=1.6.0
+isort>=5.13.0
+pre-commit>=3.6.0
