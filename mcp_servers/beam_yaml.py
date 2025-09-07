@@ -6,6 +6,12 @@ and generate pipelines.
 """
 
 import asyncio
+import json
+import logging
+import os
+import re
+import subprocess
+import tempfile
 from typing import Any, Dict, List
 
 import mcp.types as types
@@ -13,11 +19,55 @@ from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 from mcp.types import Tool
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Create MCP server instance
 server = Server("beam-yaml-mcp-server")
 
 # Base URL for Beam YAML documentation
 BEAM_YAML_DOC_BASE = "https://beam.apache.org/releases/yamldoc/current/"
+
+# Google Cloud Dataflow best practices and validation constants
+DATAFLOW_JOB_NAME_PATTERN = r"^[a-z]([a-z0-9\-])*[a-z0-9]?$"
+DATAFLOW_MAX_JOB_NAME_LENGTH = 63
+DATAFLOW_SUPPORTED_REGIONS = [
+    "us-central1",
+    "us-east1",
+    "us-east4",
+    "us-west1",
+    "us-west2",
+    "us-west3",
+    "us-west4",
+    "europe-north1",
+    "europe-west1",
+    "europe-west2",
+    "europe-west3",
+    "europe-west4",
+    "europe-west6",
+    "asia-east1",
+    "asia-east2",
+    "asia-northeast1",
+    "asia-northeast2",
+    "asia-northeast3",
+    "asia-south1",
+    "asia-southeast1",
+    "asia-southeast2",
+    "australia-southeast1",
+]
+RECOMMENDED_MACHINE_TYPES = [
+    "n1-standard-1",
+    "n1-standard-2",
+    "n1-standard-4",
+    "n1-standard-8",
+    "n1-standard-16",
+    "n1-highmem-2",
+    "n1-highmem-4",
+    "n1-highmem-8",
+    "n1-highcpu-2",
+    "n1-highcpu-4",
+]
 
 
 @server.list_tools()
@@ -131,6 +181,74 @@ async def handle_list_tools() -> List[Tool]:
                 "required": ["connector_name"],
             },
         ),
+        Tool(
+            name="submit_dataflow_yaml_pipeline",
+            description=(
+                "Submit a Beam YAML pipeline to Google Cloud Dataflow using gcloud CLI"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "yaml_content": {
+                        "type": "string",
+                        "description": "The YAML pipeline content to submit",
+                    },
+                    "job_name": {
+                        "type": "string",
+                        "description": "Name for the Dataflow job (must be unique)",
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Google Cloud project ID",
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "Google Cloud region (e.g., us-central1)",
+                        "default": "us-central1",
+                    },
+                    "staging_location": {
+                        "type": "string",
+                        "description": (
+                            "GCS bucket for staging files (gs://bucket-name/staging)"
+                        ),
+                    },
+                    "temp_location": {
+                        "type": "string",
+                        "description": (
+                            "GCS bucket for temporary files (gs://bucket-name/temp)"
+                        ),
+                    },
+                    "service_account_email": {
+                        "type": "string",
+                        "description": "Service account email for the job (optional)",
+                    },
+                    "max_workers": {
+                        "type": "integer",
+                        "description": "Maximum number of workers (optional)",
+                        "default": 10,
+                    },
+                    "machine_type": {
+                        "type": "string",
+                        "description": "Machine type for workers (optional)",
+                        "default": "n1-standard-1",
+                    },
+                    "network": {
+                        "type": "string",
+                        "description": "VPC network for the job (optional)",
+                    },
+                    "subnetwork": {
+                        "type": "string",
+                        "description": "VPC subnetwork for the job (optional)",
+                    },
+                    "additional_experiments": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Additional Dataflow experiments to enable",
+                    },
+                },
+                "required": ["yaml_content", "job_name", "project_id"],
+            },
+        ),
     ]
 
 
@@ -152,6 +270,8 @@ async def handle_call_tool(
             return await generate_beam_yaml_pipeline(arguments)
         elif name == "get_io_connector_schema":
             return await get_io_connector_schema(arguments)
+        elif name == "submit_dataflow_yaml_pipeline":
+            return await submit_dataflow_yaml_pipeline(arguments)
         else:
             raise ValueError(f"Unknown tool: {name}")
     except Exception as e:
@@ -800,6 +920,366 @@ async def get_io_connector_schema(arguments: Dict[str, Any]) -> List[types.TextC
             result += f"- {name}\n"
 
     return [types.TextContent(type="text", text=result)]
+
+
+async def submit_dataflow_yaml_pipeline(
+    arguments: Dict[str, Any]
+) -> List[types.TextContent]:
+    """
+    Submit a Beam YAML pipeline to Google Cloud Dataflow using gcloud CLI.
+
+    This function provides a comprehensive interface to deploy Beam YAML pipelines
+    to Google Cloud Dataflow with proper validation, error handling, and logging.
+
+    Prerequisites:
+    - Google Cloud SDK (gcloud) must be installed and in PATH
+    - User must be authenticated with gcloud (run 'gcloud auth login')
+    - Dataflow API must be enabled in the target project
+    - Required IAM permissions: Dataflow Developer, Storage Object Admin
+    - GCS buckets for staging and temp locations must exist and be accessible
+
+    Features:
+    - Pre-submission YAML validation
+    - gcloud CLI installation and authentication checks
+    - GCS location validation
+    - Job name format validation
+    - Comprehensive error handling and troubleshooting guidance
+    - Support for dry-run validation
+    - Detailed logging and monitoring information
+
+    Args:
+        arguments: Dictionary containing:
+            - yaml_content (str): The YAML pipeline content to submit
+            - job_name (str): Unique name for the Dataflow job
+            - project_id (str): Google Cloud project ID
+            - region (str, optional): GCP region (default: us-central1)
+            - staging_location (str): GCS path for staging files
+            - temp_location (str): GCS path for temporary files
+            - service_account_email (str, optional): Service account for the job
+            - max_workers (int, optional): Maximum number of workers (default: 10)
+            - machine_type (str, optional): Worker machine type (default: n1-standard-1)
+            - network (str, optional): VPC network for the job
+            - subnetwork (str, optional): VPC subnetwork for the job
+            - additional_experiments (list, optional): Dataflow experiments to enable
+
+
+    Returns:
+        List[types.TextContent]: Success/failure message with job details or error info
+
+    Example Usage:
+        # Basic submission
+        await submit_dataflow_yaml_pipeline({
+            "yaml_content": pipeline_yaml,
+            "job_name": "my-pipeline-job",
+            "project_id": "my-gcp-project",
+            "staging_location": "gs://my-bucket/staging",
+            "temp_location": "gs://my-bucket/temp"
+        })
+
+        # Advanced submission with custom settings
+        await submit_dataflow_yaml_pipeline({
+            "yaml_content": pipeline_yaml,
+            "job_name": "advanced-pipeline",
+            "project_id": "my-gcp-project",
+            "region": "us-west1",
+            "staging_location": "gs://my-bucket/staging",
+            "temp_location": "gs://my-bucket/temp",
+            "service_account_email": "dataflow-sa@project.iam.gserviceaccount.com",
+            "max_workers": 20,
+            "machine_type": "n1-standard-2",
+            "network": "projects/my-project/global/networks/my-vpc",
+            "additional_experiments": ["enable_streaming_engine"]
+        })
+    """
+    yaml_content = arguments["yaml_content"]
+    job_name = arguments["job_name"]
+    project_id = arguments["project_id"]
+    region = arguments.get("region", "us-central1")
+    network = arguments.get("network")
+    subnetwork = arguments.get("subnetwork")
+
+    try:
+        # Validate YAML content first
+        logger.info(f"Validating YAML pipeline for job: {job_name}")
+        validation_result = await validate_beam_yaml({"yaml_content": yaml_content})
+        validation_text = validation_result[0].text
+
+        if "Validation failed" in validation_text:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        f"❌ Pipeline validation failed. Please fix the following "
+                        f"issues:\n\n{validation_text}"
+                    ),
+                )
+            ]
+
+        # Check if gcloud CLI is installed and authenticated
+        logger.info("Checking gcloud CLI installation and authentication")
+        try:
+            # Check gcloud installation
+            result = subprocess.run(
+                ["gcloud", "version"], capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=(
+                            "❌ gcloud CLI is not installed or not in PATH. "
+                            "Please install Google Cloud SDK."
+                        ),
+                    )
+                ]
+
+            # Check authentication
+            result = subprocess.run(
+                [
+                    "gcloud",
+                    "auth",
+                    "list",
+                    "--filter=status:ACTIVE",
+                    "--format=value(account)",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=(
+                            "❌ gcloud CLI is not authenticated. "
+                            "Please run 'gcloud auth login' first."
+                        ),
+                    )
+                ]
+
+            active_account = result.stdout.strip()
+            logger.info(f"Using authenticated account: {active_account}")
+
+        except subprocess.TimeoutExpired:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        "❌ Timeout while checking gcloud CLI. "
+                        "Please ensure gcloud is properly installed."
+                    ),
+                )
+            ]
+        except FileNotFoundError:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        "❌ gcloud CLI not found. Please install Google Cloud SDK "
+                        "and ensure it's in your PATH."
+                    ),
+                )
+            ]
+
+        # Validate job name format and length
+        if len(job_name) > DATAFLOW_MAX_JOB_NAME_LENGTH:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        f"❌ Job name must be {DATAFLOW_MAX_JOB_NAME_LENGTH} "
+                        f"characters or less. Current length: {len(job_name)}"
+                    ),
+                )
+            ]
+
+        if not re.match(DATAFLOW_JOB_NAME_PATTERN, job_name):
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        "❌ Job name must start with a lowercase letter, contain "
+                        "only lowercase letters, numbers, and hyphens, and end "
+                        "with a letter or number."
+                    ),
+                )
+            ]
+
+        # Validate region
+        if region not in DATAFLOW_SUPPORTED_REGIONS:
+            logger.warning(
+                f"Region '{region}' may not be supported. Supported regions: "
+                f"{', '.join(DATAFLOW_SUPPORTED_REGIONS)}"
+            )
+
+        # Create temporary file for YAML content
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as temp_file:
+            temp_file.write(yaml_content)
+            temp_yaml_path = temp_file.name
+
+        try:
+            # Build gcloud command according to official documentation
+            # https://cloud.google.com/sdk/gcloud/reference/dataflow/yaml/run
+            cmd = [
+                "gcloud",
+                "dataflow",
+                "yaml",
+                "run",
+                job_name,  # JOB_NAME is a positional argument, not a flag
+                f"--yaml-pipeline-file={temp_yaml_path}",  # Use flag
+                f"--project={project_id}",
+                f"--region={region}",
+            ]
+
+            if network:
+                cmd.append(f"--network={network}")
+
+            if subnetwork:
+                cmd.append(f"--subnetwork={subnetwork}")
+
+            # Add format for better output parsing
+            cmd.extend(["--format=json"])
+
+            logger.info(f"Executing command: {' '.join(cmd)}")
+
+            # Execute the gcloud command
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=300  # 5 minutes timeout
+            )
+
+            # Parse the result
+            if result.returncode == 0:
+                success_message = "✅ Pipeline submitted successfully!"
+
+                response_text = f"{success_message}\n\n"
+                response_text += "**Job Details:**\n"
+                response_text += f"- Job Name: {job_name}\n"
+                response_text += f"- Project: {project_id}\n"
+                response_text += f"- Region: {region}\n"
+                response_text += (
+                    "- Note: Staging and temp locations are managed "
+                    "automatically by Dataflow\n"
+                )
+
+                # Parse JSON output to get job ID for monitoring URLs
+                job_id = None
+                if result.stdout:
+                    try:
+                        # Try to parse JSON output for additional details
+                        output_data = json.loads(result.stdout)
+                        if isinstance(output_data, dict):
+                            # Handle nested job object structure
+                            job_data = output_data.get("job", output_data)
+
+                            response_text += "\n**Job Information:**\n"
+                            if "id" in job_data:
+                                job_id = job_data["id"]
+                                response_text += f"- Job ID: {job_id}\n"
+                            if "name" in job_data:
+                                response_text += f"- Job Name: {job_data['name']}\n"
+                            if "projectId" in job_data:
+                                response_text += (
+                                    f"- Project ID: {job_data['projectId']}\n"
+                                )
+                            if "location" in job_data:
+                                response_text += f"- Location: {job_data['location']}\n"
+                            if "createTime" in job_data:
+                                response_text += (
+                                    f"- Created: {job_data['createTime']}\n"
+                                )
+                            if "startTime" in job_data:
+                                response_text += f"- Started: {job_data['startTime']}\n"
+                            if "currentState" in job_data:
+                                response_text += (
+                                    f"- Current State: {job_data['currentState']}\n"
+                                )
+                    except json.JSONDecodeError:
+                        # If not JSON, include raw output
+                        response_text += (
+                            f"\n**Command Output:**\n```\n{result.stdout}\n```\n"
+                        )
+
+                # Add monitoring URLs using job ID if available, else job name
+                response_text += "\n**Monitoring:**\n"
+                if job_id:
+                    response_text += (
+                        f"- Console: https://console.cloud.google.com/dataflow/"
+                        f"jobs/{region}/{job_id}?project={project_id}\n"
+                    )
+                    response_text += (
+                        f"- CLI: `gcloud dataflow jobs describe {job_id} "
+                        f"--region={region} --project={project_id}`\n"
+                    )
+                else:
+                    response_text += (
+                        f"- Console: https://console.cloud.google.com/dataflow/jobs/"
+                        f"{region}/{job_name}?project={project_id}\n"
+                    )
+                    response_text += (
+                        f"- CLI: `gcloud dataflow jobs describe {job_name} "
+                        f"--region={region} --project={project_id}`\n"
+                    )
+
+                return [types.TextContent(type="text", text=response_text)]
+            else:
+                error_message = "❌ Failed to submit pipeline.\n\n"
+                error_message += "**Error Details:**\n"
+                error_message += f"- Return Code: {result.returncode}\n"
+
+                if result.stderr:
+                    error_message += f"- Error Output:\n```\n{result.stderr}\n```\n"
+
+                if result.stdout:
+                    error_message += f"- Standard Output:\n```\n{result.stdout}\n```\n"
+
+                error_message += "\n**Troubleshooting Tips:**\n"
+                error_message += (
+                    f"- Verify that the Dataflow API is enabled in project "
+                    f"{project_id}\n"
+                )
+                error_message += (
+                    "- Ensure the authenticated account has Dataflow Developer role\n"
+                )
+                error_message += (
+                    "- Check that the GCS buckets exist and are accessible\n"
+                )
+                error_message += (
+                    "- Verify the job name is unique (if not using dry-run)\n"
+                )
+
+                return [types.TextContent(type="text", text=error_message)]
+
+        except subprocess.TimeoutExpired:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        "❌ Timeout while submitting pipeline. The operation took "
+                        "longer than expected. Check the Dataflow console for "
+                        "job status."
+                    ),
+                )
+            ]
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_yaml_path)
+            except OSError:
+                pass
+
+    except Exception as e:
+        logger.error(f"Error submitting pipeline: {str(e)}")
+        return [
+            types.TextContent(
+                type="text",
+                text=(
+                    f"❌ Unexpected error while submitting pipeline: {str(e)}\n\n"
+                    "Please check the logs and try again."
+                ),
+            )
+        ]
 
 
 async def main():

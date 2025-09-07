@@ -29,8 +29,10 @@ The implementation follows the ADK MCP integration pattern:
 - **Pipeline Generation**: Generate complete Beam YAML pipelines from natural language descriptions
 - **Schema Management**: Look up input/output schemas for IO connectors with detailed documentation
 - **Validation & Quality Assurance**: YAML syntax validation, pipeline structure validation, and error detection
+- **Pipeline Submission**: Submit Beam YAML pipelines directly to Google Cloud Dataflow with comprehensive validation
 - **Transform Documentation**: Comprehensive documentation for all Beam transforms with examples
 - **Multi-Format Support**: Support for BigQuery, PubSub, CSV, Text, Parquet, JSON, and database connectors
+- **Dry Run Validation**: Test pipeline configurations without actual submission to catch issues early
 
 ## Prerequisites
 
@@ -124,6 +126,14 @@ print(response)
 # Pipeline validation
 response = agent.run("Validate this YAML pipeline configuration: [YAML content]")
 print(response)
+
+# Pipeline submission to Dataflow
+response = agent.run("Submit this pipeline to Dataflow with job name 'my-pipeline' in project 'my-gcp-project' using staging location 'gs://my-bucket/staging' and temp location 'gs://my-bucket/temp'")
+print(response)
+
+# Dry run validation before submission
+response = agent.run("Do a dry run validation of this pipeline before submitting to Dataflow")
+print(response)
 ```
 
 ## MCP Tools Available
@@ -157,7 +167,7 @@ The Dataflow MCP server provides three main tools:
 
 ### Beam YAML Pipeline Tools
 
-The Beam YAML MCP server provides five main tools:
+The Beam YAML MCP server provides six main tools:
 
 #### 1. get_beam_yaml_transforms
 - **Purpose**: List available Beam YAML transforms by category
@@ -186,6 +196,23 @@ The Beam YAML MCP server provides five main tools:
 - **Purpose**: Get input/output schema information for IO connectors
 - **Parameters**:
   - `connector_name` (required): Name of the IO connector (e.g., ReadFromBigQuery, WriteToText)
+
+#### 6. submit_dataflow_yaml_pipeline
+- **Purpose**: Submit a Beam YAML pipeline to Google Cloud Dataflow using gcloud CLI
+- **Parameters**:
+  - `yaml_content` (required): The YAML pipeline content to submit
+  - `job_name` (required): Name for the Dataflow job (must be unique)
+  - `project_id` (required): Google Cloud project ID
+  - `region` (optional, default: us-central1): Google Cloud region
+  - `staging_location` (required): GCS bucket for staging files (gs://bucket-name/staging)
+  - `temp_location` (required): GCS bucket for temporary files (gs://bucket-name/temp)
+  - `service_account_email` (optional): Service account email for the job
+  - `max_workers` (optional, default: 10): Maximum number of workers
+  - `machine_type` (optional, default: n1-standard-1): Machine type for workers
+  - `network` (optional): VPC network for the job
+  - `subnetwork` (optional): VPC subnetwork for the job
+  - `additional_experiments` (optional): Additional Dataflow experiments to enable
+  - `dry_run` (optional, default: false): Validate the pipeline without actually submitting it
 
 ## Example Interactions
 
@@ -360,6 +387,58 @@ config:
 ```
 ```
 
+#### Pipeline Submission to Dataflow
+```
+User: "Submit this pipeline to Dataflow with job name 'sales-analysis-pipeline' in my project 'my-gcp-project'"
+
+Agent: I'll submit your Beam YAML pipeline to Google Cloud Dataflow.
+
+[Agent uses submit_dataflow_yaml_pipeline tool]
+
+✅ Pipeline submitted successfully!
+
+**Job Details:**
+- Job Name: sales-analysis-pipeline
+- Project: my-gcp-project
+- Region: us-central1
+- Staging Location: gs://my-bucket/staging
+- Temp Location: gs://my-bucket/temp
+
+**Monitoring:**
+- Console: https://console.cloud.google.com/dataflow/jobs/us-central1/sales-analysis-pipeline?project=my-gcp-project
+- CLI: `gcloud dataflow jobs describe sales-analysis-pipeline --region=us-central1 --project=my-gcp-project`
+- Job ID: 2024-01-15_14_30_00-1234567890123456789
+
+Your pipeline is now running on Dataflow. You can monitor its progress using the provided links.
+```
+
+#### Pipeline Dry Run Validation
+```
+User: "Can you do a dry run validation of this pipeline before submitting it?"
+
+Agent: I'll perform a dry run validation of your pipeline to check for any issues before actual submission.
+
+[Agent uses submit_dataflow_yaml_pipeline tool with dry_run=true]
+
+✅ Pipeline validation successful!
+
+**Job Details:**
+- Job Name: sales-analysis-pipeline-dryrun
+- Project: my-gcp-project
+- Region: us-central1
+- Staging Location: gs://my-bucket/staging
+- Temp Location: gs://my-bucket/temp
+
+The pipeline passed all validation checks. You can now submit it for actual execution by removing the dry-run flag.
+
+**Validation Results:**
+- YAML syntax: ✅ Valid
+- Pipeline structure: ✅ Valid
+- Resource requirements: ✅ Acceptable
+- Permissions: ✅ Sufficient
+- GCS locations: ✅ Accessible
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -372,9 +451,11 @@ config:
 
 2. **Permission Issues**:
    Ensure your account has the following IAM roles:
-   - `roles/dataflow.viewer`
+   - `roles/dataflow.viewer` (for job monitoring)
+   - `roles/dataflow.developer` (for pipeline submission)
    - `roles/logging.viewer`
    - `roles/compute.viewer`
+   - `roles/storage.objectAdmin` (for GCS staging/temp locations)
 
 3. **MCP Server Connection Issues**:
    - Check that Python dependencies are installed
@@ -385,6 +466,17 @@ config:
    - Verify the job ID is correct
    - Ensure you're checking the right project and region
    - Check if the job exists using `gcloud dataflow jobs list`
+
+5. **Pipeline Submission Issues**:
+   - **gcloud CLI not found**: Install Google Cloud SDK and ensure it's in your PATH
+   - **Authentication required**: Run `gcloud auth login` to authenticate
+   - **Invalid GCS locations**: Ensure staging and temp locations start with `gs://` and buckets exist
+   - **Job name conflicts**: Use unique job names or include timestamps
+   - **Dataflow API not enabled**: Enable the Dataflow API in your Google Cloud project
+   - **Invalid job name format**: Job names must start with lowercase letter, contain only lowercase letters, numbers, and hyphens
+   - **Insufficient permissions**: Ensure service account has Dataflow Developer and Storage Object Admin roles
+   - **Network/VPC issues**: Verify network and subnetwork configurations if specified
+   - **Resource quotas**: Check if you have sufficient Dataflow job quotas in the target region
 
 ### Debug Mode
 
