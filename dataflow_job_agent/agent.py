@@ -19,8 +19,8 @@ def create_dataflow_agent():
             "args": [
                 os.path.join(
                     os.path.dirname(os.path.dirname(__file__)),
-                    "mcp_server",
-                    "dataflow_mcp_server.py",
+                    "mcp_servers",
+                    "dataflow_jobs.py",
                 )
             ],
             "env": os.environ.copy(),

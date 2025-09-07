@@ -6,7 +6,7 @@ This project implements a Google Agent Development Kit (ADK) agent that monitors
 
 The implementation follows the ADK MCP integration pattern:
 
-1. **MCP Server** (`mcp_server/dataflow_mcp_server.py`): Wraps Google Cloud CLI commands for Dataflow operations
+1. **MCP Server** (`mcp_servers/dataflow_jobs.py`): Wraps Google Cloud CLI commands for Dataflow operations
 2. **ADK Agent** (`agent.py`): Uses MCPToolset to connect to the MCP server and provide intelligent job monitoring
 
 ## Features
@@ -238,8 +238,8 @@ df-agent/
 ├── .env                                   # Environment configuration
 ├── requirements.txt                       # Python dependencies
 ├── README.md                              # This file
-├── mcp_server/
-│   └── dataflow_mcp_server.py             # MCP server implementation (top-level)
+├── mcp_servers/
+│   └── dataflow_jobs.py             # MCP server implementation (top-level)
 └── dataflow_job_agent/
     └── agent.py                           # Main ADK agent
 ```
