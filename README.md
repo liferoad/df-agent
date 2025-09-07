@@ -6,7 +6,7 @@ This project implements a Google Agent Development Kit (ADK) agent that monitors
 
 The implementation follows the ADK MCP integration pattern:
 
-1. **MCP Server** (`dataflow_mcp_server.py`): Wraps Google Cloud CLI commands for Dataflow operations
+1. **MCP Server** (`mcp_server/dataflow_mcp_server.py`): Wraps Google Cloud CLI commands for Dataflow operations
 2. **ADK Agent** (`agent.py`): Uses MCPToolset to connect to the MCP server and provide intelligent job monitoring
 
 ## Features
@@ -96,14 +96,14 @@ The MCP server provides three main tools:
 - **Purpose**: Get detailed status of a specific job
 - **Parameters**:
   - `job_id` (required): The Dataflow job ID
-  - `project_id` (optional): Google Cloud project ID
-  - `region` (optional): Google Cloud region
+  - `project_id` (required): Google Cloud project ID
+  - `region` (optional, default: us-central1): Google Cloud region
 
 ### 2. list_dataflow_jobs
 - **Purpose**: List Dataflow jobs with filtering
 - **Parameters**:
-  - `project_id` (optional): Google Cloud project ID
-  - `region` (optional): Google Cloud region
+  - `project_id` (required): Google Cloud project ID
+  - `region` (optional, default: us-central1): Google Cloud region
   - `status` (optional): Filter by status (active, terminated, failed, all)
   - `limit` (optional): Maximum number of jobs to return
 
@@ -111,9 +111,9 @@ The MCP server provides three main tools:
 - **Purpose**: Retrieve logs for a specific job
 - **Parameters**:
   - `job_id` (required): The Dataflow job ID
-  - `project_id` (optional): Google Cloud project ID
-  - `region` (optional): Google Cloud region
-  - `severity` (optional): Minimum log severity (DEBUG, INFO, WARNING, ERROR)
+  - `project_id` (required): Google Cloud project ID
+  - `region` (optional, default: us-central1): Google Cloud region
+  - `severity` (optional, default: INFO): Minimum log severity (DEBUG, INFO, WARNING, ERROR)
 
 ## Example Interactions
 
@@ -238,12 +238,10 @@ df-agent/
 ├── .env                                   # Environment configuration
 ├── requirements.txt                       # Python dependencies
 ├── README.md                              # This file
-├── tests/
-│   └── test_agent.py                      # Test script
+├── mcp_server/
+│   └── dataflow_mcp_server.py             # MCP server implementation (top-level)
 └── dataflow_job_agent/
-    ├── agent.py                           # Main ADK agent
-    └── mcp_server/
-        └── dataflow_mcp_server.py         # MCP server implementation
+    └── agent.py                           # Main ADK agent
 ```
 
 ### Testing

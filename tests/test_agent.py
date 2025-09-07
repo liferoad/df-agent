@@ -66,7 +66,7 @@ def test_mcp_server_import():
     Test that the MCP server module can be imported.
     """
     try:
-        from dataflow_job_agent.mcp_server import dataflow_mcp_server
+        from mcp_server import dataflow_mcp_server
 
         assert dataflow_mcp_server is not None
     except ImportError:
@@ -127,7 +127,7 @@ def test_mcp_server():
 
     try:
         # Import the MCP server module
-        import dataflow_job_agent.mcp_server.dataflow_mcp_server  # noqa: F401
+        import mcp_server.dataflow_mcp_server  # noqa: F401
 
         print("✅ MCP server module imported successfully!")
 
