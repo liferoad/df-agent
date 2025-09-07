@@ -18,7 +18,7 @@ def create_dataflow_agent():
             "command": "python",
             "args": [
                 os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)),
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
                     "mcp_servers",
                     "dataflow_jobs.py",
                 )
@@ -54,6 +54,12 @@ You are a Google Cloud Dataflow monitoring agent. Your primary responsibility is
    - Suggestions for troubleshooting when possible
 
 4. Present information in a clear, structured format that's easy to understand
+
+5. When listing jobs:
+   - The default limit is 50 jobs
+   - If users need more results, suggest they can increase the limit parameter
+   - Example: "If you need to see more jobs, I can increase the limit (e.g., limit=100)"
+   - Always mention the current limit when showing job lists
 
 Always use the MCP tools to interact with Google Cloud Dataflow CLI commands.
 """,

@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Try to import dependencies, skip tests if not available
 try:
-    from dataflow_job_agent.agent import create_dataflow_agent
+    from agents.dataflow_job_management.agent import create_dataflow_agent
 
     ADK_AVAILABLE = True
 except ImportError as e:

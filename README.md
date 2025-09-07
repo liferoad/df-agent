@@ -65,8 +65,9 @@ The implementation follows the ADK MCP integration pattern:
 
 ### Running with ADK Web
 
-1. Start the ADK web interface:
+1. Start the ADK web interface from the agents directory:
    ```bash
+   cd agents
    adk web
    ```
 
@@ -78,7 +79,7 @@ The implementation follows the ADK MCP integration pattern:
 ### Direct Python Usage
 
 ```python
-from dataflow_job_agent.agent import create_dataflow_agent
+from agents.dataflow_job_management.agent import create_dataflow_agent
 
 # Create the agent
 agent = create_dataflow_agent()
@@ -235,13 +236,16 @@ pre-commit run --all-files # Run all hooks
 ### Project Structure
 ```
 df-agent/
-├── .env                                   # Environment configuration
-├── requirements.txt                       # Python dependencies
-├── README.md                              # This file
+├── .env                                   # Environment variables and configuration
+├── requirements.txt                       # Python package dependencies
+├── README.md                              # Project documentation and setup guide
 ├── mcp_servers/
-│   └── dataflow_jobs.py             # MCP server implementation (top-level)
-└── dataflow_job_agent/
-    └── agent.py                           # Main ADK agent
+│   └── dataflow_jobs.py                  # MCP server wrapping Google Cloud Dataflow CLI
+├── agents/
+│   └── dataflow_job_management/
+│       └── agent.py                       # ADK agent with intelligent job monitoring
+└── tests/
+    └── test_job_agent.py                  # Comprehensive test suite for agent functionality
 ```
 
 ### Testing

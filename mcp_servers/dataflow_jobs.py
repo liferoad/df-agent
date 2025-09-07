@@ -71,8 +71,8 @@ async def handle_list_tools() -> List[Tool]:
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of jobs to return (default: 10)",
-                        "default": 10,
+                        "description": "Maximum number of jobs to return (default: 50)",
+                        "default": 50,
                     },
                 },
                 "required": ["project_id"],
@@ -221,7 +221,7 @@ async def list_dataflow_jobs(arguments: Dict[str, Any]) -> List[types.TextConten
     project_id = arguments["project_id"]  # Now required
     region = arguments.get("region", "us-central1")  # Default to us-central1
     status = arguments.get("status", "all")
-    limit = arguments.get("limit", 10)
+    limit = arguments.get("limit", 50)
 
     # Build gcloud command with required project_id and region
     cmd = [
@@ -256,7 +256,7 @@ async def list_dataflow_jobs(arguments: Dict[str, Any]) -> List[types.TextConten
             jobs_data = [
                 job
                 for job in jobs_data
-                if job.get("currentState") in ["JOB_STATE_FAILED", "FAILED"]
+                if job.get("state", "").upper() in ["JOB_STATE_FAILED", "FAILED"]
             ]
 
         if not jobs_data:
@@ -280,7 +280,7 @@ async def list_dataflow_jobs(arguments: Dict[str, Any]) -> List[types.TextConten
         for job in jobs_data:
             job_id = job.get("id", "N/A")
             name = job.get("name", "N/A")
-            state = job.get("currentState", "UNKNOWN")
+            state = job.get("state", "UNKNOWN")
             job_type = job.get("type", "N/A")
             create_time = job.get("createTime", "N/A")
 
