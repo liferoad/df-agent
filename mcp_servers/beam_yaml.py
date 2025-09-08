@@ -209,13 +209,15 @@ async def handle_list_tools() -> List[Tool]:
                     "staging_location": {
                         "type": "string",
                         "description": (
-                            "GCS bucket for staging files (gs://bucket-name/staging)"
+                            "GCS bucket for staging files "
+                            "(gs://bucket-name/staging) (optional)"
                         ),
                     },
                     "temp_location": {
                         "type": "string",
                         "description": (
-                            "GCS bucket for temporary files (gs://bucket-name/temp)"
+                            "GCS bucket for temporary files "
+                            "(gs://bucket-name/temp) (optional)"
                         ),
                     },
                     "service_account_email": {
@@ -953,8 +955,8 @@ async def submit_dataflow_yaml_pipeline(
             - job_name (str): Unique name for the Dataflow job
             - project_id (str): Google Cloud project ID
             - region (str, optional): GCP region (default: us-central1)
-            - staging_location (str): GCS path for staging files
-            - temp_location (str): GCS path for temporary files
+            - staging_location (str, optional): GCS path for staging files
+            - temp_location (str, optional): GCS path for temporary files
             - service_account_email (str, optional): Service account for the job
             - max_workers (int, optional): Maximum number of workers (default: 10)
             - machine_type (str, optional): Worker machine type (default: n1-standard-1)
@@ -967,13 +969,21 @@ async def submit_dataflow_yaml_pipeline(
         List[types.TextContent]: Success/failure message with job details or error info
 
     Example Usage:
-        # Basic submission
+        # Basic submission (staging and temp locations managed automatically)
+        await submit_dataflow_yaml_pipeline({
+            "yaml_content": pipeline_yaml,
+            "job_name": "my-pipeline-job",
+            "project_id": "my-gcp-project"
+        })
+
+        # Submission with custom pipeline options
         await submit_dataflow_yaml_pipeline({
             "yaml_content": pipeline_yaml,
             "job_name": "my-pipeline-job",
             "project_id": "my-gcp-project",
             "staging_location": "gs://my-bucket/staging",
-            "temp_location": "gs://my-bucket/temp"
+            "temp_location": "gs://my-bucket/temp",
+            "service_account_email": "dataflow-sa@project.iam.gserviceaccount.com"
         })
 
         # Advanced submission with custom settings
@@ -997,6 +1007,11 @@ async def submit_dataflow_yaml_pipeline(
     region = arguments.get("region", "us-central1")
     network = arguments.get("network")
     subnetwork = arguments.get("subnetwork")
+
+    # Extract optional pipeline options
+    staging_location = arguments.get("staging_location")
+    temp_location = arguments.get("temp_location")
+    service_account_email = arguments.get("service_account_email")
 
     try:
         # Validate YAML content first
@@ -1139,6 +1154,22 @@ async def submit_dataflow_yaml_pipeline(
             if subnetwork:
                 cmd.append(f"--subnetwork={subnetwork}")
 
+            # Build pipeline options if any are provided
+            pipeline_options = []
+            if staging_location:
+                pipeline_options.append(f"staging_location={staging_location}")
+            if temp_location:
+                pipeline_options.append(f"temp_location={temp_location}")
+            if service_account_email:
+                pipeline_options.append(
+                    f"service_account_email={service_account_email}"
+                )
+
+            if pipeline_options:
+                # Join multiple options with semicolon as per gcloud documentation
+                options_string = ";".join(pipeline_options)
+                cmd.append(f"--pipeline-options={options_string}")
+
             # Add format for better output parsing
             cmd.extend(["--format=json"])
 
@@ -1158,10 +1189,21 @@ async def submit_dataflow_yaml_pipeline(
                 response_text += f"- Job Name: {job_name}\n"
                 response_text += f"- Project: {project_id}\n"
                 response_text += f"- Region: {region}\n"
-                response_text += (
-                    "- Note: Staging and temp locations are managed "
-                    "automatically by Dataflow\n"
-                )
+
+                # Show pipeline options if any were used
+                if staging_location or temp_location or service_account_email:
+                    response_text += "\n**Pipeline Options:**\n"
+                    if staging_location:
+                        response_text += f"- Staging Location: {staging_location}\n"
+                    if temp_location:
+                        response_text += f"- Temp Location: {temp_location}\n"
+                    if service_account_email:
+                        response_text += f"- Service Account: {service_account_email}\n"
+                else:
+                    response_text += (
+                        "- Note: Staging and temp locations are managed "
+                        "automatically by Dataflow\n"
+                    )
 
                 # Parse JSON output to get job ID for monitoring URLs
                 job_id = None
