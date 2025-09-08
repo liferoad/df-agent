@@ -24,7 +24,8 @@ def create_dataflow_agent():
                 )
             ],
             "env": os.environ.copy(),
-        }
+        },
+        timeout=30,  # Set timeout to 30 seconds
     )
 
     # Create McpToolset that connects to our Dataflow MCP server

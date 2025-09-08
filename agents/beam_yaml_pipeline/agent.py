@@ -24,7 +24,8 @@ def create_beam_yaml_agent():
                 )
             ],
             "env": os.environ.copy(),
-        }
+        },
+        timeout=30,  # Set timeout to 30 seconds
     )
 
     # Create McpToolset that connects to our Beam YAML MCP server
