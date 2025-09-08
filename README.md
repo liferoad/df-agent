@@ -589,11 +589,14 @@ df-agent/
 │   ├── dataflow_jobs.py                  # MCP server wrapping Google Cloud Dataflow CLI
 │   └── beam_yaml.py                      # MCP server for Beam YAML pipeline operations
 ├── agents/
+│   ├── dataflow_coordinator/
+│   │   └── agent.py                       # ADK coordinator agent managing pipeline lifecycle
 │   ├── dataflow_job_management/
 │   │   └── agent.py                       # ADK agent with intelligent job monitoring
 │   └── beam_yaml_pipeline/
 │       └── agent.py                       # ADK agent for Beam YAML pipeline generation
 └── tests/
+    ├── test_dataflow_coordinator_agent.py # Test suite for coordinator agent functionality
     ├── test_job_agent.py                  # Test suite for Dataflow agent functionality
     └── test_beam_yaml_agent.py            # Test suite for Beam YAML agent functionality
 ```
@@ -607,6 +610,9 @@ pytest tests/
 
 Run tests for specific agents:
 ```bash
+# Test Dataflow Coordinator Agent
+pytest tests/test_dataflow_coordinator_agent.py -v
+
 # Test Dataflow Job Management Agent
 pytest tests/test_job_agent.py -v
 
