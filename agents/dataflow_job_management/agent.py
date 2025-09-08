@@ -3,7 +3,7 @@ import os
 
 from google.adk.agents import LlmAgent
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 
 
 # Create the Dataflow MCP agent
@@ -27,8 +27,8 @@ def create_dataflow_agent():
         }
     )
 
-    # Create MCPToolset that connects to our Dataflow MCP server
-    dataflow_mcp_toolset = MCPToolset(
+    # Create McpToolset that connects to our Dataflow MCP server
+    dataflow_mcp_toolset = McpToolset(
         connection_params=mcp_connection,
         tool_filter=None,  # Use all tools from the MCP server
     )

@@ -4,20 +4,52 @@ This project implements multiple Google Agent Development Kit (ADK) agents using
 
 ## Available Agents
 
-### 1. Dataflow Job Management Agent
+### 1. Dataflow Coordinator Agent (Multi-Agent System)
+A sophisticated multi-agent coordinator that orchestrates the complete Dataflow pipeline lifecycle using the ADK agent hierarchy pattern <mcreference link="https://google.github.io/adk-docs/agents/multi-agents/#agent-hierarchy-parent-agent-sub-agents" index="0">0</mcreference>. This coordinator manages two specialized sub-agents:
+
+- **BeamYAMLPipelineAgent**: Handles pipeline generation and validation
+- **DataflowStatusAgent**: Manages job monitoring and troubleshooting
+
+The coordinator provides intelligent task delegation, end-to-end workflow management, and coordinated responses across both pipeline development and job management domains.
+
+### 2. Dataflow Job Management Agent
 Monitors Google Cloud Dataflow jobs with capabilities to check job status, list jobs, and retrieve logs for failed jobs.
 
-### 2. Beam YAML Pipeline Agent
+### 3. Beam YAML Pipeline Agent
 Generates, validates, and manages Apache Beam YAML pipelines with comprehensive support for creating data processing pipelines using natural language descriptions.
 
 ## Architecture
 
-The implementation follows the ADK MCP integration pattern:
+The implementation follows multiple ADK patterns:
 
-1. **MCP Server** (`mcp_servers/dataflow_jobs.py`): Wraps Google Cloud CLI commands for Dataflow operations
-2. **ADK Agent** (`agent.py`): Uses MCPToolset to connect to the MCP server and provide intelligent job monitoring
+### Multi-Agent System Architecture
+The **Dataflow Coordinator Agent** implements the ADK multi-agent system pattern <mcreference link="https://google.github.io/adk-docs/agents/multi-agents/#agent-hierarchy-parent-agent-sub-agents" index="0">0</mcreference>:
+
+1. **Parent Agent** (`agents/dataflow_coordinator/agent.py`): Coordinates and delegates tasks
+2. **Sub-Agents**: Specialized agents with distinct capabilities
+   - `BeamYAMLPipelineAgent`: Pipeline generation and validation
+   - `DataflowStatusAgent`: Job monitoring and management
+3. **Agent Hierarchy**: Parent-child relationships enable structured task delegation and context sharing
+
+### Traditional MCP Integration Pattern
+Individual agents follow the ADK MCP integration pattern:
+
+1. **MCP Servers**: Wrap external tools and services
+   - `mcp_servers/dataflow_jobs.py`: Google Cloud CLI commands for Dataflow operations
+   - `mcp_servers/beam_yaml.py`: Beam YAML pipeline tools and validation
+2. **ADK Agents**: Use McpToolset to connect to MCP servers and provide intelligent capabilities
 
 ## Features
+
+### Dataflow Coordinator Agent (Multi-Agent System)
+- **Intelligent Task Delegation**: Automatically routes requests to appropriate sub-agents based on context
+- **End-to-End Workflow Management**: Coordinates complete pipeline lifecycle from generation to monitoring
+- **Sequential & Parallel Coordination**: Manages complex workflows involving multiple agents
+- **Cross-Domain Error Handling**: Coordinates troubleshooting across pipeline and job management domains
+- **Unified Interface**: Single point of interaction for all Dataflow-related tasks
+- **Agent Hierarchy Navigation**: Leverages ADK parent-child relationships for structured task management
+- **Context Sharing**: Enables information flow between specialized sub-agents
+- **Workflow Orchestration**: Supports both sequential pipeline development and parallel monitoring tasks
 
 ### Dataflow Job Management Agent
 - **Job Status Checking**: Get detailed status information for specific Dataflow jobs
@@ -90,11 +122,39 @@ The implementation follows the ADK MCP integration pattern:
    ```
 
 2. Navigate to the agent in your browser and interact with it using natural language:
+
+   **Dataflow Coordinator Agent Examples:**
+   - "I need to create a Beam YAML pipeline that reads from BigQuery and writes to PubSub, then monitor its execution"
+   - "Generate a pipeline for real-time data processing and check if any similar jobs are currently running"
+   - "My pipeline job failed, can you help troubleshoot and suggest improvements?"
+   - "Create a batch processing pipeline and show me the status of all recent jobs"
+
+   **Individual Agent Examples:**
    - "Check the status of job 2024-01-15_12_00_00-1234567890123456789"
    - "List all failed Dataflow jobs"
    - "Show me the logs for the failed job xyz-123"
 
 ### Direct Python Usage
+
+#### Dataflow Coordinator Agent (Recommended)
+```python
+from agents.dataflow_coordinator.agent import create_dataflow_coordinator_agent
+
+# Create the coordinator agent
+coordinator = create_dataflow_coordinator_agent()
+
+# The coordinator automatically delegates to appropriate sub-agents
+# Pipeline generation requests → BeamYAMLPipelineAgent
+# Job monitoring requests → DataflowStatusAgent
+# Complex workflows → Coordinated execution
+
+# Example: End-to-end workflow
+response = coordinator.run(
+    "Create a pipeline that processes streaming data from PubSub "
+    "and then check if there are any similar jobs currently running"
+)
+print(response)
+```
 
 #### Dataflow Job Management Agent
 ```python
