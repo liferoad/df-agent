@@ -229,7 +229,15 @@ pipeline:
        name: ReadEvents
        config:
          subscription: "projects/my-project/subscriptions/events-sub"
-         format: "json"  # REQUIRED parameter
+         format: "json"  # REQUIRED: "json", "avro", "string", or "raw"
+         schema:
+           fields:
+             - name: event_type
+               type: STRING
+             - name: timestamp
+               type: STRING
+             - name: value
+               type: DOUBLE
     - type: WindowInto
       name: WindowEvents
       input: ReadEvents

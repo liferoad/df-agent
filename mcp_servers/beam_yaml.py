@@ -1167,7 +1167,7 @@ async def submit_dataflow_yaml_pipeline(
 
             if pipeline_options:
                 # Join multiple options with semicolon as per gcloud documentation
-                options_string = ";".join(pipeline_options)
+                options_string = ",".join(pipeline_options)
                 cmd.append(f"--pipeline-options={options_string}")
 
             # Add format for better output parsing
