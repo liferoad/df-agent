@@ -11,6 +11,9 @@ google-auth>=2.23.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.1
 
+# Apache Beam with YAML support for pipeline validation
+apache-beam[gcp,yaml]>=2.50.0
+
 # Additional dependencies for JSON handling and async operations
 aiofiles>=23.2.0
 pydantic>=2.5.0

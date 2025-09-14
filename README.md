@@ -18,6 +18,9 @@ Monitors Google Cloud Dataflow jobs with capabilities to check job status, list 
 ### 3. Beam YAML Pipeline Agent
 Generates, validates, and manages Apache Beam YAML pipelines with comprehensive support for creating data processing pipelines using natural language descriptions.
 
+### 4. Beam YAML Guide Agent
+Provides step-by-step interactive guidance for creating Apache Beam YAML pipelines. This specialized agent systematically gathers all necessary information about pipeline structure, validates user inputs, and generates properly formatted YAML configurations through a structured 5-phase workflow.
+
 ## Architecture
 
 The implementation follows multiple ADK patterns:
@@ -65,6 +68,15 @@ Individual agents follow the ADK MCP integration pattern:
 - **Transform Documentation**: Comprehensive documentation for all Beam transforms with examples
 - **Multi-Format Support**: Support for BigQuery, PubSub, CSV, Text, Parquet, JSON, and database connectors
 - **Dry Run Validation**: Test pipeline configurations without actual submission to catch issues early
+
+### Beam YAML Guide Agent
+- **Interactive Step-by-Step Guidance**: Systematic 5-phase workflow for pipeline creation (Requirements → Source → Transforms → Sink → Generation)
+- **Focused Question Flow**: One-question-at-a-time approach with clear options and explanations
+- **Comprehensive Input Validation**: Validates user responses against Beam YAML requirements with specific error messages
+- **Educational Approach**: Explains concepts and decisions throughout the pipeline creation process
+- **Production-Ready Output**: Generates complete, properly formatted YAML pipelines with error handling
+- **User-Friendly Design**: Makes complex pipeline creation accessible to users of all skill levels
+- **Systematic Information Gathering**: Methodically collects all necessary configuration details for sources, transforms, and sinks
 
 ## Prerequisites
 
@@ -134,6 +146,11 @@ Individual agents follow the ADK MCP integration pattern:
    - "List all failed Dataflow jobs"
    - "Show me the logs for the failed job xyz-123"
 
+   **Beam YAML Guide Agent Examples:**
+   - "I want to create a new Beam YAML pipeline" (starts interactive guidance)
+   - "Help me build a pipeline step by step"
+   - "Guide me through creating a data processing pipeline"
+
 ### Direct Python Usage
 
 #### Dataflow Coordinator Agent (Recommended)
@@ -194,6 +211,36 @@ print(response)
 # Dry run validation before submission
 response = agent.run("Do a dry run validation of this pipeline before submitting to Dataflow")
 print(response)
+```
+
+#### Beam YAML Guide Agent
+```python
+from agents.beam_yaml_guide.agent import create_beam_yaml_guide_agent
+
+# Create the agent
+aguide = create_beam_yaml_guide_agent()
+
+# Start interactive pipeline creation
+response = guide.run("I want to create a new Beam YAML pipeline")
+print(response)
+
+# The agent will guide you through:
+# 1. Requirements gathering
+# 2. Data source configuration
+# 3. Transformation design
+# 4. Output destination setup
+# 5. Pipeline generation and validation
+
+# Example guided interaction:
+response = guide.run("Help me build a pipeline that processes sales data")
+print(response)
+# Agent: "Welcome! I'll help you create a Beam YAML pipeline step by step.
+#         First, can you describe what you want your pipeline to do?"
+
+# Continue the conversation based on agent's questions
+response = guide.run("I want to read sales data from BigQuery and write summaries to Cloud Storage")
+print(response)
+# Agent will ask specific questions about BigQuery table, transformations needed, etc.
 ```
 
 ## MCP Tools Available
@@ -593,12 +640,15 @@ df-agent/
 │   │   └── agent.py                       # ADK coordinator agent managing pipeline lifecycle
 │   ├── dataflow_job_management/
 │   │   └── agent.py                       # ADK agent with intelligent job monitoring
-│   └── beam_yaml_pipeline/
-│       └── agent.py                       # ADK agent for Beam YAML pipeline generation
+│   ├── beam_yaml_pipeline/
+│   │   └── agent.py                       # ADK agent for Beam YAML pipeline generation
+│   └── beam_yaml_guide/
+│       └── agent.py                       # ADK agent for step-by-step pipeline guidance
 └── tests/
     ├── test_dataflow_coordinator_agent.py # Test suite for coordinator agent functionality
     ├── test_job_agent.py                  # Test suite for Dataflow agent functionality
-    └── test_beam_yaml_agent.py            # Test suite for Beam YAML agent functionality
+    ├── test_beam_yaml_agent.py            # Test suite for Beam YAML agent functionality
+    └── test_beam_yaml_guide_agent.py      # Test suite for Beam YAML guide agent functionality
 ```
 
 ### Testing
@@ -618,6 +668,9 @@ pytest tests/test_job_agent.py -v
 
 # Test Beam YAML Pipeline Agent
 pytest tests/test_beam_yaml_agent.py -v
+
+# Test Beam YAML Guide Agent
+pytest tests/test_beam_yaml_guide_agent.py -v
 ```
 
 ## License

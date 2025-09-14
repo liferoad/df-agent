@@ -10,8 +10,9 @@ def create_dataflow_coordinator_agent():
     Create a multi-agent coordinator that orchestrates Beam YAML pipeline generation
     and Dataflow job management using the ADK agent hierarchy pattern.
 
-    This coordinator agent manages two specialized sub-agents:
+    This coordinator agent manages three specialized sub-agents:
     - BeamYAMLPipelineAgent: For generating and validating Beam YAML pipelines
+    - BeamYAMLGuideAgent: For step-by-step interactive pipeline creation guidance
     - DataflowStatusAgent: For monitoring and managing Dataflow jobs
     """
 
@@ -40,6 +41,17 @@ def create_dataflow_coordinator_agent():
     spec.loader.exec_module(dataflow_job_module)
     dataflow_job_agent = dataflow_job_module.create_dataflow_agent()
 
+    # Import beam_yaml_guide agent
+    beam_yaml_guide_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "beam_yaml_guide", "agent.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "beam_yaml_guide_agent", beam_yaml_guide_path
+    )
+    beam_yaml_guide_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(beam_yaml_guide_module)
+    beam_yaml_guide_agent = beam_yaml_guide_module.create_beam_yaml_guide_agent()
+
     # Create the coordinator agent with sub-agents
     coordinator = LlmAgent(
         name="DataflowCoordinator",
@@ -59,10 +71,15 @@ Your primary responsibilities include:
    - Provide end-to-end guidance from development to deployment
 
 2. **Task Delegation Strategy**:
-   - **For YAML pipeline tasks**: Delegate to BeamYAMLPipelineAgent
-     * Pipeline generation and validation
+   - **For advanced YAML pipeline tasks**: Delegate to BeamYAMLPipelineAgent
+     * Direct pipeline generation and validation
      * Transform documentation and schema lookup
      * Best practices and optimization guidance
+
+   - **For guided pipeline creation**: Delegate to BeamYAMLGuideAgent
+     * Step-by-step interactive pipeline creation
+     * Beginner-friendly guidance and education
+     * Systematic information gathering for pipeline requirements
 
    - **For job monitoring tasks**: Delegate to DataflowStatusAgent
      * Job status checking and monitoring
@@ -82,17 +99,28 @@ Your primary responsibilities include:
 
 **Example Coordination Scenarios**:
 
-**Scenario 1: New Pipeline Development**
+**Scenario 1: Guided Pipeline Development (Beginner/Interactive)**
+```
+User: "I want to create a pipeline but I'm not sure about the details"
+
+Coordination Flow:
+1. Delegate to BeamYAMLGuideAgent for step-by-step guidance
+2. Guide user through requirements, sources, transforms, and sinks
+3. Generate validated pipeline through interactive process
+4. Provide deployment guidance and monitoring setup
+```
+
+**Scenario 2: Direct Pipeline Development (Advanced)**
 ```
 User: "I need to create a pipeline that reads from BigQuery and writes to PubSub"
 
 Coordination Flow:
-1. Delegate to BeamYAMLPipelineAgent for YAML generation
+1. Delegate to BeamYAMLPipelineAgent for direct YAML generation
 2. Once pipeline is ready, provide deployment guidance
 3. After deployment, delegate to DataflowStatusAgent for monitoring
 ```
 
-**Scenario 2: Pipeline Troubleshooting**
+**Scenario 3: Pipeline Troubleshooting**
 ```
 User: "My pipeline is failing, can you help?"
 
@@ -102,7 +130,7 @@ Coordination Flow:
 3. Coordinate fixes between pipeline updates and job redeployment
 ```
 
-**Scenario 3: Performance Optimization**
+**Scenario 4: Performance Optimization**
 ```
 User: "How can I optimize my running pipeline?"
 
@@ -128,7 +156,7 @@ Coordination Flow:
 Remember: You coordinate and delegate, but the specialized agents handle
 the technical implementation details within their domains.
 """,
-        sub_agents=[beam_yaml_agent, dataflow_job_agent],
+        sub_agents=[beam_yaml_agent, beam_yaml_guide_agent, dataflow_job_agent],
     )
 
     return coordinator

@@ -251,6 +251,30 @@ async def handle_list_tools() -> List[Tool]:
                 "required": ["yaml_content", "job_name", "project_id"],
             },
         ),
+        Tool(
+            name="dry_run_beam_yaml_pipeline",
+            description=(
+                "Perform a dry-run validation of a Beam YAML pipeline using "
+                "apache_beam.yaml.main"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "yaml_content": {
+                        "type": "string",
+                        "description": "The YAML pipeline content to validate",
+                    },
+                    "runner": {
+                        "type": "string",
+                        "description": (
+                            "Runner to use for validation (default: DirectRunner)"
+                        ),
+                        "default": "DirectRunner",
+                    },
+                },
+                "required": ["yaml_content"],
+            },
+        ),
     ]
 
 
@@ -274,6 +298,8 @@ async def handle_call_tool(
             return await get_io_connector_schema(arguments)
         elif name == "submit_dataflow_yaml_pipeline":
             return await submit_dataflow_yaml_pipeline(arguments)
+        elif name == "dry_run_beam_yaml_pipeline":
+            return await dry_run_beam_yaml_pipeline(arguments)
         else:
             raise ValueError(f"Unknown tool: {name}")
     except Exception as e:
@@ -283,7 +309,7 @@ async def handle_call_tool(
 
 
 async def get_beam_yaml_transforms(
-    arguments: Dict[str, Any]
+    arguments: Dict[str, Any],
 ) -> List[types.TextContent]:
     """
     Get list of available Beam YAML transforms.
@@ -548,7 +574,7 @@ async def validate_beam_yaml(arguments: Dict[str, Any]) -> List[types.TextConten
 
 
 async def generate_beam_yaml_pipeline(
-    arguments: Dict[str, Any]
+    arguments: Dict[str, Any],
 ) -> List[types.TextContent]:
     """
     Generate a Beam YAML pipeline based on requirements.
@@ -925,7 +951,7 @@ async def get_io_connector_schema(arguments: Dict[str, Any]) -> List[types.TextC
 
 
 async def submit_dataflow_yaml_pipeline(
-    arguments: Dict[str, Any]
+    arguments: Dict[str, Any],
 ) -> List[types.TextContent]:
     """
     Submit a Beam YAML pipeline to Google Cloud Dataflow using gcloud CLI.
@@ -1319,6 +1345,190 @@ async def submit_dataflow_yaml_pipeline(
                 text=(
                     f"❌ Unexpected error while submitting pipeline: {str(e)}\n\n"
                     "Please check the logs and try again."
+                ),
+            )
+        ]
+
+
+async def dry_run_beam_yaml_pipeline(
+    arguments: Dict[str, Any],
+) -> List[types.TextContent]:
+    """
+    Perform a dry-run validation of a Beam YAML pipeline using apache_beam.yaml.main.
+
+    This function provides comprehensive pipeline validation by actually running
+    the Beam YAML parser and validator without executing the pipeline. It catches
+    syntax errors, transform configuration issues, and pipeline connectivity problems
+    that basic YAML validation might miss.
+
+    Args:
+        arguments: Dictionary containing:
+            - yaml_content (str): The YAML pipeline content to validate
+            - runner (str, optional): Runner to use for validation
+              (default: DirectRunner)
+
+    Returns:
+        List[types.TextContent]: Validation results with detailed error information
+    """
+    yaml_content = arguments["yaml_content"]
+    runner = arguments.get("runner", "DirectRunner")
+
+    try:
+        # Create temporary file for YAML content
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as temp_file:
+            temp_file.write(yaml_content)
+            temp_yaml_path = temp_file.name
+
+        try:
+            # Build command to run apache_beam.yaml.main with dry-run
+            cmd = [
+                "python",
+                "-m",
+                "apache_beam.yaml.main",
+                f"--yaml_pipeline_file={temp_yaml_path}",
+                f"--runner={runner}",
+                "--dry_run=True",  # Enable dry-run mode
+                # The temp_location parameter is required but is unused
+                # when dry_run is True
+                "--temp_location",
+                "gs://",
+                "--project",
+                "test",
+                "--region",
+                "test",
+            ]
+
+            logger.info(f"Running dry-run validation: {' '.join(cmd)}")
+
+            # Execute the validation command
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=120,  # 2 minutes timeout
+                cwd=tempfile.gettempdir(),  # Run in temp directory
+            )
+
+            # Parse the result
+            if result.returncode == 0:
+                success_message = "✅ Beam YAML pipeline dry-run validation passed!"
+
+                response_text = f"{success_message}\n\n"
+                response_text += "**Validation Details:**\n"
+                response_text += f"- Runner: {runner}\n"
+                response_text += "- Pipeline syntax: Valid\n"
+                response_text += "- Transform configurations: Valid\n"
+                response_text += "- Pipeline connectivity: Valid\n"
+
+                if result.stdout:
+                    # Include any informational output
+                    response_text += (
+                        f"\n**Validation Output:**\n```\n{result.stdout.strip()}\n```\n"
+                    )
+
+                response_text += "\n**Next Steps:**\n"
+                response_text += "- Pipeline is ready for execution\n"
+                response_text += "- Consider testing with a small dataset first\n"
+                response_text += "- Use submit_dataflow_yaml_pipeline for deployment\n"
+
+                return [types.TextContent(type="text", text=response_text)]
+            else:
+                error_message = "❌ Beam YAML pipeline dry-run validation failed.\n\n"
+                error_message += "**Validation Errors:**\n"
+
+                if result.stderr:
+                    # Parse and format error messages
+                    stderr_lines = result.stderr.strip().split("\n")
+                    formatted_errors = []
+
+                    for line in stderr_lines:
+                        # Filter out less relevant log messages
+                        if any(
+                            skip in line.lower()
+                            for skip in [
+                                "warning:",
+                                "info:",
+                                "debug:",
+                                "java.util.logging",
+                            ]
+                        ):
+                            continue
+                        if line.strip():
+                            formatted_errors.append(f"- {line.strip()}")
+
+                    if formatted_errors:
+                        error_message += "\n".join(formatted_errors) + "\n"
+                    else:
+                        error_message += f"```\n{result.stderr}\n```\n"
+
+                if result.stdout:
+                    error_message += (
+                        f"\n**Additional Output:**\n```\n{result.stdout}\n```\n"
+                    )
+
+                error_message += "\n**Common Issues and Solutions:**\n"
+                error_message += (
+                    "- **Transform not found**: Check transform names against "
+                    "official documentation\n"
+                )
+                error_message += (
+                    "- **Configuration error**: Verify required parameters for "
+                    "each transform\n"
+                )
+                error_message += (
+                    "- **Schema mismatch**: Ensure field references match input "
+                    "data schema\n"
+                )
+                error_message += (
+                    "- **Connectivity issue**: Check that 'input' fields "
+                    "reference valid transform names\n"
+                )
+                error_message += (
+                    "- **Missing dependencies**: Ensure apache-beam[yaml] is "
+                    "installed\n"
+                )
+
+                return [types.TextContent(type="text", text=error_message)]
+
+        except subprocess.TimeoutExpired:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        "❌ Dry-run validation timed out. The pipeline may be "
+                        "too complex or there might be an infinite loop in the "
+                        "configuration."
+                    ),
+                )
+            ]
+        except FileNotFoundError:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        "❌ Apache Beam YAML module not found. Please ensure "
+                        "apache-beam[yaml] is installed: pip install apache-beam[yaml]"
+                    ),
+                )
+            ]
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_yaml_path)
+            except OSError:
+                pass
+
+    except Exception as e:
+        logger.error(f"Error during dry-run validation: {str(e)}")
+        return [
+            types.TextContent(
+                type="text",
+                text=(
+                    f"❌ Unexpected error during dry-run validation: {str(e)}\n\n"
+                    "Please check that apache-beam[yaml] is properly installed and "
+                    "try again."
                 ),
             )
         ]

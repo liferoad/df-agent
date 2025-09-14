@@ -32,11 +32,12 @@ class TestDataflowCoordinatorAgent:
     def test_agent_has_sub_agents(self):
         """Test that the coordinator agent has the expected sub-agents."""
         assert hasattr(self.agent, "sub_agents")
-        assert len(self.agent.sub_agents) == 2
+        assert len(self.agent.sub_agents) == 3
 
         # Check sub-agent names
         sub_agent_names = [agent.name for agent in self.agent.sub_agents]
         assert "BeamYAMLPipelineAgent" in sub_agent_names
+        assert "BeamYAMLGuideAgent" in sub_agent_names
         assert "DataflowStatusAgent" in sub_agent_names
 
     def test_sub_agents_have_parent(self):
@@ -100,13 +101,15 @@ class TestDataflowCoordinatorAgent:
         instruction = self.agent.instruction
 
         # Check for example scenarios
-        assert "New Pipeline Development" in instruction
+        assert "Guided Pipeline Development" in instruction
+        assert "Direct Pipeline Development" in instruction
         assert "Pipeline Troubleshooting" in instruction
         assert "Performance Optimization" in instruction
 
         # Check for coordination flows
         assert "Coordination Flow:" in instruction
         assert "Delegate to BeamYAMLPipelineAgent" in instruction
+        assert "Delegate to BeamYAMLGuideAgent" in instruction
         assert "Delegate to DataflowStatusAgent" in instruction
 
     def test_agent_hierarchy_structure(self):
