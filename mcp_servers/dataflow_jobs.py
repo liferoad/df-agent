@@ -112,6 +112,14 @@ async def handle_list_tools() -> List[Tool]:
                         "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
                         "default": "INFO",
                     },
+                    "log_type": {
+                        "type": "string",
+                        "description": (
+                            "Type of logs to retrieve (worker, system, harness, or all)"
+                        ),
+                        "enum": ["worker", "system", "harness", "all"],
+                        "default": "all",
+                    },
                 },
                 "required": ["job_id", "project_id"],
             },
@@ -376,20 +384,39 @@ async def list_dataflow_jobs(arguments: Dict[str, Any]) -> List[types.TextConten
 async def get_dataflow_job_logs(arguments: Dict[str, Any]) -> List[types.TextContent]:
     """
     Get logs for a specific Dataflow job.
+
+    Supports different log types:
+    - worker: Application logs from Dataflow workers
+    - system: System logs from GCE instances
+    - harness: Harness logs from the Dataflow service
+    - all: All log types (default)
     """
     job_id = arguments["job_id"]
     project_id = arguments["project_id"]  # Now required
     severity = arguments.get("severity", "INFO")
+    log_type = arguments.get("log_type", "all")
+
+    # Build log filter based on log type
+    if log_type == "worker":
+        resource_filter = 'resource.type="dataflow_step"'
+    elif log_type == "system":
+        resource_filter = 'resource.type="gce_instance"'
+    elif log_type == "harness":
+        resource_filter = 'resource.type="dataflow_step" AND logName:"harness"'
+    else:  # log_type == "all"
+        resource_filter = (
+            '(resource.type="dataflow_step" OR resource.type="gce_instance")'
+        )
 
     # Build gcloud command for logs with required project_id
     # Note: gcloud logging doesn't use --region parameter
-    # Include severity in the filter query instead of as a separate parameter
+    # Include severity and log type in the filter query
     cmd = [
         "gcloud",
         "logging",
         "read",
         (
-            f'resource.type="dataflow_step" AND '
+            f"{resource_filter} AND "
             f'resource.labels.job_id="{job_id}" AND '
             f"severity>={severity}"
         ),
@@ -415,14 +442,17 @@ async def get_dataflow_job_logs(arguments: Dict[str, Any]) -> List[types.TextCon
                 types.TextContent(
                     type="text",
                     text=(
-                        f"No logs found for job {job_id} "
+                        f"No {log_type} logs found for job {job_id} "
                         f"with severity {severity} or higher."
                     ),
                 )
             ]
 
         # Format logs
-        response = f"Dataflow Job Logs for {job_id} (severity: {severity}+):\n\n"
+        response = (
+            f"Dataflow Job {log_type.title()} Logs for {job_id} "
+            f"(severity: {severity}+):\n\n"
+        )
 
         for log_entry in logs_data:
             timestamp = log_entry.get("timestamp", "N/A")

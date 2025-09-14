@@ -273,15 +273,24 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "string",
                         "description": "The YAML pipeline content to validate",
                     },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Google Cloud project ID (required)",
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "Google Cloud region (defaults to us-central1)",
+                        "default": "us-central1",
+                    },
                     "runner": {
                         "type": "string",
                         "description": (
-                            "Runner to use for validation (default: DirectRunner)"
+                            "Runner to use for validation (default: DataflowRunner)"
                         ),
-                        "default": "DirectRunner",
+                        "default": "DataflowRunner",
                     },
                 },
-                "required": ["yaml_content"],
+                "required": ["yaml_content", "project_id"],
             },
         ),
     ]
@@ -1376,14 +1385,18 @@ async def dry_run_beam_yaml_pipeline(
     Args:
         arguments: Dictionary containing:
             - yaml_content (str): The YAML pipeline content to validate
+            - project_id (str): Google Cloud project ID (required)
+            - region (str, optional): Google Cloud region (default: us-central1)
             - runner (str, optional): Runner to use for validation
-              (default: DirectRunner)
+              (default: DataflowRunner)
 
     Returns:
         List[types.TextContent]: Validation results with detailed error information
     """
     yaml_content = arguments["yaml_content"]
-    runner = arguments.get("runner", "DirectRunner")
+    project_id = arguments["project_id"]
+    region = arguments.get("region", "us-central1")
+    runner = arguments.get("runner", "DataflowRunner")
 
     try:
         # Create temporary file for YAML content
@@ -1407,9 +1420,9 @@ async def dry_run_beam_yaml_pipeline(
                 "--temp_location",
                 "gs://",
                 "--project",
-                "test",
+                project_id,
                 "--region",
-                "test",
+                region,
             ]
 
             logger.info(f"Running dry-run validation: {' '.join(cmd)}")
