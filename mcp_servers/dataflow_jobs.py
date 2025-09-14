@@ -107,6 +107,29 @@ async def handle_list_tools() -> List[Tool]:
                 "required": ["job_id", "project_id"],
             },
         ),
+        Tool(
+            name="cancel_dataflow_job",
+            description="Cancel a running Google Cloud Dataflow job",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {
+                        "type": "string",
+                        "description": "The Dataflow job ID to cancel",
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Google Cloud project ID (required)",
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "Google Cloud region (defaults to us-central1)",
+                        "default": "us-central1",
+                    },
+                },
+                "required": ["job_id", "project_id"],
+            },
+        ),
     ]
 
 
@@ -124,6 +147,8 @@ async def handle_call_tool(
             return await list_dataflow_jobs(arguments)
         elif name == "get_dataflow_job_logs":
             return await get_dataflow_job_logs(arguments)
+        elif name == "cancel_dataflow_job":
+            return await cancel_dataflow_job(arguments)
         else:
             raise ValueError(f"Unknown tool: {name}")
     except Exception as e:
@@ -362,6 +387,52 @@ async def get_dataflow_job_logs(arguments: Dict[str, Any]) -> List[types.TextCon
         return [types.TextContent(type="text", text=error_msg)]
     except json.JSONDecodeError as e:
         error_msg = f"Failed to parse gcloud response: {str(e)}"
+        return [types.TextContent(type="text", text=error_msg)]
+
+
+async def cancel_dataflow_job(arguments: Dict[str, Any]) -> List[types.TextContent]:
+    """
+    Cancel a running Dataflow job.
+    """
+    job_id = arguments["job_id"]
+    project_id = arguments["project_id"]  # Now required
+    region = arguments.get("region", "us-central1")  # Default to us-central1
+
+    # Build gcloud command with required project_id and region
+    cmd = [
+        "gcloud",
+        "dataflow",
+        "jobs",
+        "cancel",
+        job_id,
+        "--project",
+        project_id,
+        "--region",
+        region,
+    ]
+
+    try:
+        # Execute gcloud command
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        # Format response
+        response = f"""Dataflow Job Cancellation Request:
+
+Job ID: {job_id}
+Project: {project_id}
+Region: {region}
+Status: Cancellation request submitted successfully
+
+Note: The job may take some time to fully cancel. You can check the job status using
+the check_dataflow_job_status tool to monitor the cancellation progress.
+
+Command Output:
+{result.stdout}"""
+
+        return [types.TextContent(type="text", text=response)]
+
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Failed to cancel job {job_id}:\n{e.stderr}"
         return [types.TextContent(type="text", text=error_msg)]
 
 
