@@ -345,9 +345,9 @@ pipeline:
            schema:  # REQUIRED when format is AVRO or JSON
              type: object
              properties:
-               event_type: {type: STRING}
-               timestamp: {type: STRING}
-               value: {type: DOUBLE}
+               event_type: {type: string}
+               timestamp: {type: string}
+               value: {type: double}
 
     - type: WindowInto
       name: WindowEvents
@@ -541,9 +541,9 @@ config:
   schema:  # REQUIRED when format is AVRO or JSON
     type: object
     properties:
-      field1: {type: STRING}
-      field2: {type: INTEGER}
-      data: {type: BYTES}
+      field1: {type: string}
+      field2: {type: integer}
+      data: {type: bytes}
       attributes: {type: object}
 
 # Option 2: Read from topic with AVRO format
@@ -583,9 +583,9 @@ config:
   schema:  # REQUIRED when format is AVRO or JSON
     type: object
     properties:
-      event_type: {type: STRING}
-      timestamp: {type: STRING}
-      value: {type: DOUBLE}
+      event_type: {type: string}
+      timestamp: {type: string}
+      value: {type: double}
 
 # Option 2: Write raw bytes (no schema needed)
 type: WriteToPubSub
