@@ -6,6 +6,7 @@ This server provides tools to interact with Google Cloud Dataflow via gcloud CLI
 
 import asyncio
 import json
+import os
 import subprocess
 from typing import Any, Dict, List
 
@@ -16,6 +17,14 @@ from mcp.types import Tool
 
 # Create MCP server instance
 server = Server("dataflow-mcp-server")
+
+
+def get_gcloud_timeout() -> int:
+    """
+    Get the gcloud command timeout from environment variable.
+    Defaults to 300 seconds if not set.
+    """
+    return int(os.getenv("GCLOUD_TIMEOUT", "300"))
 
 
 @server.list_tools()
@@ -210,7 +219,13 @@ async def check_dataflow_job_status(
 
     try:
         # Execute gcloud command
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=get_gcloud_timeout(),
+        )
         job_data = json.loads(result.stdout)
 
         # Extract key information
@@ -300,7 +315,13 @@ async def list_dataflow_jobs(arguments: Dict[str, Any]) -> List[types.TextConten
 
     try:
         # Execute gcloud command
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=get_gcloud_timeout(),
+        )
         jobs_data = json.loads(result.stdout)
 
         # Filter for failed jobs if requested
@@ -380,7 +401,13 @@ async def get_dataflow_job_logs(arguments: Dict[str, Any]) -> List[types.TextCon
 
     try:
         # Execute gcloud command
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=get_gcloud_timeout(),
+        )
         logs_data = json.loads(result.stdout)
 
         if not logs_data:
@@ -440,7 +467,13 @@ async def cancel_dataflow_job(arguments: Dict[str, Any]) -> List[types.TextConte
 
     try:
         # Execute gcloud command
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=get_gcloud_timeout(),
+        )
 
         # Format response
         response = f"""Dataflow Job Cancellation Request:
@@ -486,7 +519,13 @@ async def drain_dataflow_job(arguments: Dict[str, Any]) -> List[types.TextConten
 
     try:
         # Execute gcloud command
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=get_gcloud_timeout(),
+        )
 
         # Format response
         response = f"""Dataflow Job Drain Request:

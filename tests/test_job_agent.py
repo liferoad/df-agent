@@ -6,10 +6,37 @@ This script demonstrates how to use the agent and test its functionality.
 
 import asyncio
 import os
+import subprocess
 import sys
 
 import pytest
 from dotenv import load_dotenv
+
+
+def get_gcloud_timeout() -> int:
+    """
+    Get the agent timeout from environment variable.
+    Defaults to 600 seconds if not set.
+    """
+    return int(os.getenv("GCLOUD_TIMEOUT", "300"))
+
+
+def run_command_safely(command):
+    """
+    Helper function to run shell commands safely.
+    """
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=get_gcloud_timeout(),
+        )
+        return result
+    except FileNotFoundError:
+        return None
+
 
 # Load environment variables
 load_dotenv()
@@ -163,16 +190,11 @@ def check_prerequisites():
         )
 
     # Check for gcloud CLI
-    try:
-        import subprocess
-
-        result = subprocess.run(["gcloud", "--version"], capture_output=True, text=True)
-        if result.returncode == 0:
-            print("✅ Google Cloud CLI is installed")
-        else:
-            print("❌ Google Cloud CLI not found")
-    except FileNotFoundError:
-        print("❌ Google Cloud CLI not found in PATH")
+    result = run_command_safely(["gcloud", "--version"])
+    if result and result.returncode == 0:
+        print("✅ Google Cloud CLI is installed")
+    else:
+        print("❌ Google Cloud CLI not found")
 
     # Check environment variables
     required_env_vars = ["GOOGLE_CLOUD_PROJECT", "GOOGLE_AI_API_KEY"]

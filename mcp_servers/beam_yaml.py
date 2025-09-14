@@ -26,6 +26,15 @@ logger = logging.getLogger(__name__)
 # Create MCP server instance
 server = Server("beam-yaml-mcp-server")
 
+
+def get_gcloud_timeout() -> int:
+    """
+    Get the gcloud command timeout from environment variable.
+    Defaults to 300 seconds if not set.
+    """
+    return int(os.getenv("GCLOUD_TIMEOUT", "300"))
+
+
 # Base URL for Beam YAML documentation
 BEAM_YAML_DOC_BASE = "https://beam.apache.org/releases/yamldoc/current/"
 
@@ -1061,7 +1070,10 @@ async def submit_dataflow_yaml_pipeline(
         try:
             # Check gcloud installation
             result = subprocess.run(
-                ["gcloud", "version"], capture_output=True, text=True, timeout=30
+                ["gcloud", "version"],
+                capture_output=True,
+                text=True,
+                timeout=get_gcloud_timeout(),
             )
             if result.returncode != 0:
                 return [
@@ -1085,7 +1097,7 @@ async def submit_dataflow_yaml_pipeline(
                 ],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=get_gcloud_timeout(),
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return [
@@ -1203,7 +1215,7 @@ async def submit_dataflow_yaml_pipeline(
 
             # Execute the gcloud command
             result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=300  # 5 minutes timeout
+                cmd, capture_output=True, text=True, timeout=get_gcloud_timeout()
             )
 
             # Parse the result
@@ -1407,7 +1419,7 @@ async def dry_run_beam_yaml_pipeline(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=120,  # 2 minutes timeout
+                timeout=get_gcloud_timeout(),
                 cwd=tempfile.gettempdir(),  # Run in temp directory
             )
 

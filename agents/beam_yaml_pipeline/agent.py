@@ -6,6 +6,14 @@ from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 
 
+def get_agent_timeout() -> int:
+    """
+    Get the agent timeout from environment variable.
+    Defaults to 600 seconds if not set.
+    """
+    return int(os.getenv("AGENT_TIMEOUT", "600"))
+
+
 # Create the Beam YAML Pipeline agent
 def create_beam_yaml_agent():
     """
@@ -25,7 +33,7 @@ def create_beam_yaml_agent():
             ],
             "env": os.environ.copy(),
         },
-        timeout=30,  # Set timeout to 30 seconds
+        timeout=get_agent_timeout(),
     )
 
     # Create McpToolset that connects to our Beam YAML MCP server
